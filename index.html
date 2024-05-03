@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>Coordinates Debugger</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: Arial, sans-serif;
+        }
+
+        #map {
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            left: 0;
+            right: 0;
+        }
+
+        .container {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            background-color: white;
+            padding: 10px;
+            border-radius: 5px;
+            box-shadow: 0 1px 5px rgba(0, 0, 0, 0.65);
+            z-index: 1000;
+        }
+
+        .metadata-container {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background-color: white;
+            padding: 10px;
+            border-radius: 5px;
+            box-shadow: 0 1px 5px rgba(0, 0, 0, 0.65);
+            z-index: 1000;
+        }
+
+        h1 {
+            margin: 0 0 10px;
+            font-size: 18px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 5px;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="map"></div>
+    <div class="container">
+        <h1>Coordinates Debugger</h1>
+        <div>
+            <label for="inputFileInput">Input File:</label>
+            <input type="file" id="inputFileInput" accept=".json" />
+        </div>
+    </div>
+
+    <script>
+        var map = L.map('map').setView([0, 0], 1);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: 'Map data &copy; <a href="https://www.openstreetmap.org/">OpenStreetMap</a> contributors',
+            maxZoom: 18,
+        }).addTo(map);
+
+        var inputCoordinates = [];
+        var inputPolyline = null;
+        var currentPolyline = null;
+        var inputMarkers = [];
+
+        document.getElementById('inputFileInput').addEventListener('change', function (e) {
+            var file = e.target.files[0];
+            var reader = new FileReader();
+            reader.onload = function (e) {
+                var data = JSON.parse(e.target.result);
+                inputCoordinates = data.coordinates;
+                displayInputCoordinates();
+                if (data.polyline) {
+                    inputPolyline = data.polyline;
+                    displayPolyline();
+                }
+            };
+            reader.readAsText(file);
+        });
+
+        function displayInputCoordinates() {
+            inputMarkers.forEach(function (marker) {
+                map.removeLayer(marker);
+            });
+            inputMarkers = [];
+
+            inputCoordinates.forEach(function (coord) {
+                var reversedCoord = [coord.lat, coord.long]; // Reverse latitude and longitude
+                var marker = L.circleMarker(reversedCoord, {
+                    radius: 3,
+                    color: 'red',
+                    opacity: 1,
+                    fillColor: 'red',
+                    fillOpacity: 1
+                }).addTo(map);
+
+                if (coord.time) {
+                    // Add tooltip to display timestamp
+                    marker.bindTooltip(new Date(coord.time).toLocaleTimeString(), {
+                        permanent: true, // Show tooltip permanently
+                        direction: 'right', // Position the tooltip to the right of the marker
+                        opacity: 0.7
+                    }).openTooltip();
+                }
+                inputMarkers.push(marker);
+            });
+
+            if (inputMarkers.length > 0) {
+                var bounds = L.latLngBounds(inputMarkers.map(function (marker) {
+                    return marker.getLatLng();
+                }));
+                map.fitBounds(bounds);
+            }
+        }
+
+        function displayPolyline() {
+            if (currentPolyline) {
+                map.removeLayer(currentPolyline);
+            }
+            var coordinates = decodePolyline(inputPolyline);
+
+            currentPolyline = L.polyline(coordinates, { color: 'blue', opacity: 0.5 }).addTo(map);
+            map.fitBounds(currentPolyline.getBounds());
+        }
+
+        function decodePolyline(encoded) {
+            var coordinates = [];
+            var index = 0;
+            var lat = 0;
+            var lng = 0;
+
+            while (index < encoded.length) {
+                var b;
+                var shift = 0;
+                var result = 0;
+                do {
+                    b = encoded.charCodeAt(index++) - 63;
+                    result |= (b & 0x1f) << shift;
+                    shift += 5;
+                } while (b >= 0x20);
+                var dlat = ((result & 1) ? ~(result >> 1) : (result >> 1));
+                lat += dlat;
+
+                shift = 0;
+                result = 0;
+                do {
+                    b = encoded.charCodeAt(index++) - 63;
+                    result |= (b & 0x1f) << shift;
+                    shift += 5;
+                } while (b >= 0x20);
+                var dlng = ((result & 1) ? ~(result >> 1) : (result >> 1));
+                lng += dlng;
+
+                coordinates.push([lat / 1e5, lng / 1e5]);
+            }
+
+            return coordinates;
+        }
+    </script>
+</body>
+
+</html>
