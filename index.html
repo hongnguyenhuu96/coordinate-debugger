@@ -51,6 +51,16 @@
             display: block;
             margin-bottom: 5px;
         }
+
+        .input-group {
+            display: flex;
+            align-items: center;
+        }
+
+        .input-group label {
+            margin: 0;
+            margin-left: 5px;
+        }
     </style>
 </head>
 
@@ -61,6 +71,10 @@
         <div>
             <label for="inputFileInput">Input File:</label>
             <input type="file" id="inputFileInput" accept=".json" />
+        </div>
+        <div class="input-group">
+            <input type="checkbox" id="toggleTooltipsCheckbox" checked />
+            <label for="toggleTooltipsCheckbox">Show Tooltips</label>
         </div>
     </div>
 
@@ -75,6 +89,7 @@
         var inputPolyline = null;
         var currentPolyline = null;
         var inputMarkers = [];
+        var tooltipsVisible = true;
 
         document.getElementById('inputFileInput').addEventListener('change', function (e) {
             var file = e.target.files[0];
@@ -111,12 +126,22 @@
                 }).addTo(map);
 
                 if (coord.time) {
-                    // Add tooltip to display timestamp
-                    marker.bindTooltip(new Date(coord.time).toLocaleTimeString(), {
-                        permanent: true, // Show tooltip permanently
+                    var tooltip = marker.bindTooltip(new Date(coord.time).toLocaleTimeString(), {
+                        permanent: tooltipsVisible, // Show tooltip permanently if tooltipsVisible is true
                         direction: 'right', // Position the tooltip to the right of the marker
                         opacity: 0.7
-                    }).openTooltip();
+                    });
+
+                    marker.on('mouseover', function () {
+                        if (!tooltipsVisible) {
+                            this.openTooltip();
+                        }
+                    });
+                    marker.on('mouseout', function () {
+                        if (!tooltipsVisible) {
+                            this.closeTooltip();
+                        }
+                    });
                 }
                 inputMarkers.push(marker);
             });
@@ -172,6 +197,17 @@
 
             return coordinates;
         }
+
+        document.getElementById('toggleTooltipsCheckbox').addEventListener('change', function () {
+            tooltipsVisible = this.checked;
+            inputMarkers.forEach(function (marker) {
+                if (tooltipsVisible) {
+                    marker.openTooltip();
+                } else {
+                    marker.closeTooltip();
+                }
+            });
+        });
     </script>
 </body>
 
